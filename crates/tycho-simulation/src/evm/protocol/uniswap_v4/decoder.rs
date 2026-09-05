@@ -122,10 +122,17 @@ impl TryFromWithBlock<ComponentWithState, BlockHeader> for UniswapV4State {
             })
             .collect();
 
+        // A pool with no hook still carries the attribute, set to the zero address, so
+        // presence alone does not mean a hook is installed. Reading it that way gives
+        // every hookless pool a hook handler bound to `address(0)`, and `spot_price`
+        // delegates to it unconditionally — the CLMM formula is then never used.
+        //
+        // Backport of https://github.com/propeller-heads/tycho/pull/1417 onto 0.371.1.
         let hook_address = snapshot
             .component
             .static_attributes
-            .get("hooks");
+            .get("hooks")
+            .filter(|address| address.iter().any(|byte| *byte != 0));
 
         let mut ticks = match ticks {
             Ok(ticks) if !ticks.is_empty() => ticks
